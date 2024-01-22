@@ -10,6 +10,7 @@ There are wallpapers available for mobile on the Taiwan (tw) and Chinese (cn) se
 ### Demo
 
 - parallel downlad mode
+- no need install any modules :).
 - average wallpaper size are so big. so, you can stop and continue anytime.
 - it will skip if alrdy downloaded.
 - all downladed wallpaper saved in <currentdir>/AgWallpaper<server>.
