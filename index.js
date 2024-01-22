@@ -2,7 +2,9 @@
 
 const https = require("node:https");
 const path = require("node:path");
-const fs = require("fs");
+const fs = require("node:fs");
+const readline = require("node:readline/promises");
+const { stdin, stdout } = require("node:process");
 
 /**
  * aether gazer global wallpaper downloader.
@@ -93,21 +95,39 @@ const nativeDownload = async (opts) => {
  * visit official site
  * global : https://aethergazer.com/gallery
  * cn: https://skzy.ys4fun.com/main/wallpapers/
+ * tw: https://www.aethergazer.tw/main/
  *
  */
-((server) => {
+(async (server) => {
   const endpoint = {
+    tw: "https://ys-tw-open.aethergazer.tw/game-website-server/pass/game/image/list?websiteId=1&type=gameWallpaper&current=1",
     cn: "https://open.ys4fun.com/game-website-server/pass/game/image/list?websiteId=1&type=gameWallpaper&current=1",
     global:
       "https://aethergazer.com/api/gallery/list?pageIndex=1&pageNum=1&type=",
   };
   if (!server.length || !Object.keys(endpoint).includes(server[0])) {
-    console.error(`\nUsage: node agWallpaperHd.js <server:cn/global>`);
+    console.error(
+      `\n     author: @github.com/motebaya\n   Aether Gazer wallpaper downloader\n\nUsage: node agWallpaperHd.js <server:cn/global>`
+    );
     return;
   }
   const fpath = `${process.cwd()}/AgWallpaper${
-    server[0] === "cn" ? "Cn" : "Global"
+    server[0] === "cn" ? "Cn" : server[0] === "tw" ? "Tw" : "Global"
   }`;
+  const rl = readline.createInterface({ input: stdin, output: stdout });
+  let parallel = (
+    await rl.question(
+      "\n Would you like using concurrency mode?\n It's fast, but you Can't stop the download process till finish all,\n Because downloaded images will be corrupted. [y/n] : "
+    )
+  )
+    .trim()
+    .toLowerCase();
+  rl.close();
+  if (["y", "n"].includes(parallel)) {
+    parallel = parallel === "y";
+  } else {
+    process.exit(0);
+  }
   if (!fs.existsSync(fpath)) {
     fs.mkdirSync(fpath);
     console.log(` [+] Output created to: ${fpath.replace(process.cwd(), ".")}`);
@@ -124,24 +144,35 @@ const nativeDownload = async (opts) => {
             .on("end", async () => {
               data = JSON.parse(data);
               if (data.msg === "ok") {
-                for (const [i, e] of data.data.rows.entries()) {
-                  const url =
-                    e.contentImg !== "" ? e.contentImg : e.pcThumbnail;
-                  const name = `${fpath}/${e.title
-                    .replace(/\s+/g, "-")
-                    .replace(/[^a-zA-Z0-9-]/g, "")
-                    .replace(/-+/g, "-")}.${
-                    url.split("/").slice(-1)[0].split(".")[1]
-                  }`;
+                const _download = async (index, item) => {
+                  let url =
+                    item.contentImg !== "" ? item.contentImg : item.pcThumbnail;
                   console.log(
-                    ` [${i + 1}/${data.data.count}] Got \x1b[33m...${url.slice(
-                      50
-                    )}\x1b[0m`
+                    ` [${index + 1}/${
+                      data.data.count
+                    }] Got \x1b[33m...${url.slice(50)}\x1b[0m`
                   );
                   await nativeDownload({
-                    url,
-                    name,
+                    url: url,
+                    name: `${fpath}/${item.title
+                      .replace(/\s+/g, "-")
+                      .replace(/[^a-zA-Z0-9-]/g, "")
+                      .replace(/-+/g, "-")}.${
+                      url.split("/").slice(-1)[0].split(".")[1]
+                    }`,
                   });
+                };
+                const urls = Array.from(data.data.rows.entries());
+                if (parallel) {
+                  await Promise.all(
+                    urls.map(([index, item]) => {
+                      _download(index, item);
+                    })
+                  );
+                } else {
+                  for (let [index, item] of urls) {
+                    await _download(index, item);
+                  }
                 }
               }
             });
@@ -151,6 +182,7 @@ const nativeDownload = async (opts) => {
         })
         .end();
       break;
+    case "tw":
     case "cn":
       https
         .get(endpoint[server], { headers: headers }, (res) => {
@@ -162,18 +194,46 @@ const nativeDownload = async (opts) => {
             .on("end", async () => {
               data = JSON.parse(data);
               if (data.errorCode === "0") {
-                for (const [i, e] of data.data.records.entries()) {
-                  const url = e.pcUrl;
-                  const name = `${fpath}/${url.split("/").slice(-1)[0]}`;
-                  console.log(
-                    ` [${i + 1}/${data.data.total}] Got \x1b[33m...${url.slice(
-                      52
-                    )}\x1b[0m`
+                const _download = async (index, item) => {
+                  const _fetch = async (url) => {
+                    console.log(
+                      ` [${index + 1}/${
+                        data.data.total
+                      }] Got \x1b[33m...${url.slice(62)}\x1b[0m`
+                    );
+                    await nativeDownload({
+                      url: url,
+                      name: `${fpath}/${url.split("/").slice(-1)[0]}`,
+                    });
+                  };
+                  let urls = [item.pcUrl];
+                  if (item.h5Url.length !== 0) {
+                    urls.push(item.h5Url);
+                  }
+
+                  if (parallel) {
+                    await Promise.all(
+                      urls.map(async (url) => {
+                        _fetch(url);
+                      })
+                    );
+                  } else {
+                    for (let url of urls) {
+                      await _fetch(url);
+                    }
+                  }
+                };
+                const urls = Array.from(data.data.records.entries());
+                if (parallel) {
+                  await Promise.all(
+                    urls.map(async ([index, item]) => {
+                      _download(index, item);
+                    })
                   );
-                  await nativeDownload({
-                    url,
-                    name,
-                  });
+                } else {
+                  for (let [index, item] of urls) {
+                    await _download(index, item);
+                  }
                 }
               }
             });
