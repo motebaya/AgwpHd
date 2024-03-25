@@ -107,7 +107,7 @@ const nativeDownload = async (opts) => {
   };
   if (!server.length || !Object.keys(endpoint).includes(server[0])) {
     console.error(
-      `\n     author: @github.com/motebaya\n   Aether Gazer wallpaper downloader\n\nUsage: node agWallpaperHd.js <server:cn/global>`
+      `\n     author: @github.com/motebaya\n   Aether Gazer wallpaper downloader\n\nUsage: node agWallpaperHd.js <server:cn/tw/global>`
     );
     return;
   }
