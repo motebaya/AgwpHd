@@ -206,9 +206,16 @@ const nativeDownload = async (opts) => {
                       name: `${fpath}/${url.split("/").slice(-1)[0]}`,
                     });
                   };
-                  let urls = [item.pcUrl];
+                  /**
+                   * h5url -> potrait android wp
+                   * pcUrl -> desktop /pc wp
+                   */
+                  let urls = [];
                   if (item.h5Url.length !== 0) {
                     urls.push(item.h5Url);
+                  }
+                  if (item.pcUrl.length !== 0) {
+                    urls.push(item.pcUrl);
                   }
 
                   if (parallel) {
